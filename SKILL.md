@@ -1,5 +1,9 @@
 ---
 name: muse
+version: 1.0.0
+metadata:
+  openclaw:
+    emoji: "🎵"
 description: >
  AI 音乐创作助手 — 通过对话生成原创歌曲、纯音乐和 BGM。
  当用户想要创作、生成、制作任何形式的音乐时使用此技能。
@@ -31,7 +35,7 @@ description: >
 
 **工作目录**：执行任何 bash 命令前，必须先 `cd` 到本 SKILL.md 所在目录（即 skill 安装目录）。所有脚本路径（`scripts/`、`assets/`、`references/`）均基于此目录。
 
-Token 存储路径：`~/.claude/.muse/token`（纯文本文件，仅存 authToken 字符串）。
+Token 存储路径：`~/.muse/token`（纯文本文件，仅存 authToken 字符串）。
 
 ## 工作流程
 
@@ -39,7 +43,7 @@ Token 存储路径：`~/.claude/.muse/token`（纯文本文件，仅存 authToke
 
 **任何步骤中遇到 HTTP 401（Token 无效/过期）或 Token 缺失时，统一执行以下流程：**
 
-1. 删除已失效的 Token 文件：`rm -f ~/.claude/.muse/token`
+1. 删除已失效的 Token 文件：`rm -f ~/.muse/token`
 2. 获取设备 ID 并生成注册链接（两条命令顺序执行）：
 ```bash
 DEVICE_ID=$(python3 scripts/muse_api.py device-id)
@@ -70,7 +74,7 @@ REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
 ### Step 1: 认证检查
 
 按以下优先级获取 Token：
-1. 读取文件 `~/.claude/.muse/token` — 若文件存在且非空，使用其内容作为 Token
+1. 读取文件 `~/.muse/token` — 若文件存在且非空，使用其内容作为 Token
 2. 检查环境变量 `MUSE_TOKEN` — 若已设置，使用其值
 3. 以上均无 → 触发注册引导（读取 `assets/register-guide.md`）
 
@@ -82,7 +86,7 @@ REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
 
 当用户发送的消息以 `eyJ` 开头（JWT 格式），按以下流程处理：
 1. 调用 `scripts/register.py verify --token {用户粘贴的内容}` 验证有效性
-2. 验证成功 → 创建目录 `mkdir -p ~/.claude/.muse` 并将 Token 写入 `~/.claude/.muse/token`
+2. 验证成功 → 创建目录 `mkdir -p ~/.muse` 并将 Token 写入 `~/.muse/token`
 3. 验证失败 → 提示用户 Token 无效，请重新注册获取
 4. 存储成功后立即进入创作流程，展示欢迎语
 
@@ -142,7 +146,7 @@ A. 我来写 — 直接发送你的歌词
 B. AI 帮写 — 告诉我主题，AI 生成歌词供你修改
 ```
    - 用户选 A → 等待用户发送歌词（支持 [Verse] [Chorus] 等结构标签）
-   - 用户选 B → 请用户描述主题（至少 10 个字），运行 `scripts/muse_api.py generate-lyrics --token $TOKEN --mode master --title "{标题}" --prompt "{用户描述}"` 生成歌词
+   - 用户选 B → 请用户描述主题（至少 10 个字），运行 `scripts/muse_api.py generate-lyrics --token $TOKEN --mode master --title "{标题}" --prompt "{用户描述}"` 生成歌词。**必须使用 `--mode master`（同步返回），禁止使用 `--mode lite`（异步），因为 lite 模式会占用生成队列导致后续歌曲生成被阻塞。** 如果 master 模式返回 502/503 错误，不要重试 API，改由 AI 直接根据用户描述创作歌词（使用 [Verse] [Chorus] 等结构标签）
 5. 展示歌词供用户确认/修改（用户回复"OK"确认，或发送修改后的版本）
 
 ---

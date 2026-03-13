@@ -14,7 +14,7 @@ import urllib.error
 BASE_URL = "https://skill-api.muse.top"
 
 # 设备 ID 持久化路径
-_DEVICE_ID_PATH = os.path.expanduser("~/.claude/.muse/device_id")
+_DEVICE_ID_PATH = os.path.expanduser("~/.muse/device_id")
 
 
 def _get_machine_id():

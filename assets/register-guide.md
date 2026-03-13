@@ -13,7 +13,7 @@ REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
 
 ## 场景：用户未设置 Token
 
-当 `~/.claude/.muse/token` 文件不存在且环境变量 `MUSE_TOKEN` 未设置时，使用以下引导流程。
+当 `~/.muse/token` 文件不存在且环境变量 `MUSE_TOKEN` 未设置时，使用以下引导流程。
 
 ### 引导提示
 
@@ -34,7 +34,7 @@ REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
 用户粘贴的内容以 `eyJ` 开头时，自动识别为 Token：
 
 1. 运行 `scripts/register.py verify --token {Token}` 验证
-2. 验证成功 → `mkdir -p ~/.claude/.muse && echo "{Token}" > ~/.claude/.muse/token`
+2. 验证成功 → `mkdir -p ~/.muse && echo "{Token}" > ~/.muse/token`
 3. 回复：
 ```
 ✅ 认证成功！
@@ -63,7 +63,7 @@ Token 验证失败，可能已过期或不完整。
 
 ## 注意事项
 
-- Token 存储路径：`~/.claude/.muse/token`
+- Token 存储路径：`~/.muse/token`
 - Token 有效期 180 天，过期后自动触发重新注册
 - 新注册用户会获得初始积分，提醒可以立即开始创作
 - 全程不在对话中暴露 Token 完整值
