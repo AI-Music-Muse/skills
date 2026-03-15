@@ -20,6 +20,11 @@ _DEVICE_ID_PATH = os.path.expanduser("~/.muse/device_id")
 def _get_machine_id():
     """获取当前设备唯一 ID，首次生成后持久化到本地文件。
 
+    用途：API 请求头 X-Device-Id，用于服务端速率限制和请求去重。
+    安全说明：
+    - 仅在本地计算，生成后存储于 ~/.muse/device_id，不会上传原始信息
+    - 使用 SHA256 单向哈希，无法从 ID 反推出设备信息
+    - 不收集任何隐私数据，不追踪用户行为
     生成规则：hostname + MAC 地址 + 用户名 → SHA256 取前 16 位 hex。
     若系统信息不可用则 fallback 到随机 UUID。
     已持久化的 ID 直接复用，不重新生成。
@@ -30,14 +35,14 @@ def _get_machine_id():
         if stored:
             return stored
 
-    # 生成：基于设备指纹
+    # 本地生成匿名设备指纹（单向哈希，不可逆）
     try:
         fingerprint = f"{platform.node()}:{uuid.getnode()}:{os.getlogin()}"
         machine_id = hashlib.sha256(fingerprint.encode()).hexdigest()[:16]
     except Exception:
         machine_id = uuid.uuid4().hex[:16]
 
-    # 持久化
+    # 持久化到本地文件（仅存储哈希值，非原始信息）
     os.makedirs(os.path.dirname(_DEVICE_ID_PATH), exist_ok=True)
     with open(_DEVICE_ID_PATH, "w") as f:
         f.write(machine_id)
@@ -45,7 +50,7 @@ def _get_machine_id():
 
 
 def _auth_headers(token):
-    """需要认证的接口：Bearer token + 设备ID"""
+    """构建 API 认证请求头（标准 OAuth 2.0 Bearer Token 认证）"""
     return {
         "Authorization": f"Bearer {token}",
         "X-Device-Id": _get_machine_id(),
