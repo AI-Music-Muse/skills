@@ -13,7 +13,7 @@
 
 set -e
 
-VERSION="1.0.3"
+VERSION="1.0.4"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="$HOME/.muse"
 

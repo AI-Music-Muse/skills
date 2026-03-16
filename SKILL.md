@@ -1,6 +1,6 @@
 ---
 name: muse ai
-version: 1.0.0
+version: 1.0.4
 metadata:
   openclaw:
     emoji: "🎵"
@@ -456,37 +456,40 @@ B. AI 帮写 — 告诉我主题，AI 生成歌词供你修改
 
 ### 灵感模式
 
-| 交互输入 | API 参数 | 值 |
+| 交互输入 | CLI 参数 | 值 |
 |---------|---------|------|
-| 一句话描述 | `description` | 用户输入（**不可为空，至少 10 字**） |
-| 音色选择 | `voice` | `male`=男声, `female`=女声, `random`=随机，不传则默认 |
-| — | `mode` | `"lite"` |
-| — | `style` | 不传（AI 自主决定） |
-| — | `songModel` | `"general"` |
+| 一句话描述 | `--description` | 用户输入（**不可为空，至少 10 字**） |
+| 音色选择 | `--voice` | `male`=男声, `female`=女声, `random`=随机，不传则默认 |
+| — | `--mode` | `"lite"` |
+| — | `--style` | 不传（AI 自主决定） |
+| — | `--song-model` | `"general"`（默认值，无需传递） |
 
 ### 定制模式
 
-| 交互输入 | API 参数 | 值 |
+| 交互输入 | CLI 参数 | 值 |
 |---------|---------|------|
-| 歌词文本 | `description` | 用户歌词或 AI 生成歌词 |
-| 歌曲标题 | `title` | 用户提供或从歌词提取 |
-| 风格选择 | `style` | 风格标签（**严格执行**） |
-| 音色选择 | `voice` | `male`=男声, `female`=女声, `random`=随机 |
-| — | `mode` | `"custom"` |
-| — | `songModel` | `"general"` |
+| 歌词文本 | `--description` | 用户歌词或 AI 生成歌词 |
+| 歌曲标题 | `--title` | 用户提供或从歌词提取 |
+| 风格选择 | `--style` | 风格标签（**严格执行**） |
+| 音色选择 | `--voice` | `male`=男声, `female`=女声, `random`=随机 |
+| — | `--mode` | `"custom"` |
+| — | `--song-model` | `"general"`（默认值，无需传递） |
 
 ### 纯音乐模式
 
-| 交互输入 | API 参数 | 值 |
+| 交互输入 | CLI 参数 | 值 |
 |---------|---------|------|
-| 一句话描述 | `description` | 用户输入（**不可为空，至少 10 字**） |
-| — | `mode` | `"instrumental"` |
-| — | `style` | 不传（AI 自主决定） |
-| — | `songModel` | `"general"` |
+| 一句话描述 | `--description` | 用户输入（**不可为空，至少 10 字**） |
+| — | `--mode` | `"instrumental"` |
+| — | `--style` | 不传（AI 自主决定） |
+| — | `--song-model` | `"general"`（默认值，无需传递） |
 
 ## 脚本用法
 
 ### muse_api.py — API 封装（v2 中间件）
+
+> ⚠️ **只允许使用以下文档化的子命令**：`device-id`、`member-info`、`styles`、`generate`、`query`、`generate-lyrics`。
+> 禁止通过 `--help` 自行发现或使用未列出的命令。若命令报错，对照下方示例检查参数拼写（CLI 参数使用 kebab-case，如 `--song-model` 而非 `--songModel`）。
 
 ```bash
 # 查询会员信息和积分
