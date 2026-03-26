@@ -8,7 +8,7 @@ import os
 
 # 复用 muse_api 的接口
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from muse_api import send_code, login, member_info, MuseAPIError
+from muse_api import send_code, login, member_info, MuseAPIError, _save_token
 
 # 合法手机号号段（中国大陆）
 _VALID_PHONE_PREFIXES = (
@@ -58,16 +58,19 @@ def main():
             data = login(args.phone, args.code)
             auth_token = data.get("authToken", "")
             new_reg = data.get("newReg", False)
+            if auth_token:
+                _save_token(auth_token)
             _print_json({
                 "success": True,
                 "authToken": auth_token,
                 "newReg": new_reg,
                 "message": "注册成功！" if new_reg else "登录成功！",
-                "next_step": f"请设置环境变量：MUSE_TOKEN={auth_token}",
+                "next_step": "Token 已自动保存到 ~/.muse/token",
             })
 
         elif args.command == "verify":
             info = member_info(args.token)
+            _save_token(args.token)
             _print_json({
                 "valid": True,
                 "credits": info.get("credits", info.get("credit", 0)),

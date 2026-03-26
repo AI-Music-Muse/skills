@@ -1,6 +1,6 @@
 ---
 name: muse ai
-version: 1.0.4
+version: 1.0.6
 metadata:
   openclaw:
     emoji: "🎵"
@@ -26,22 +26,21 @@ description: >
 
 **工作目录**：执行任何 bash 命令前，必须先 `cd` 到本 SKILL.md 所在目录（即 skill 安装目录）。所有脚本路径（`scripts/`、`assets/`、`references/`）均基于此目录。
 
-Token 存储路径：`~/.muse/token`（纯文本文件，仅存 authToken 字符串）。
+Token 由脚本自动管理，存储于 `~/.muse/token`，无需手动操作。
 
 ## 工作流程
 
 ### Step 0: 认证兜底（Token 失败统一入口）
 
-**任何步骤中遇到 HTTP 401（Token 无效/过期）或 Token 缺失时，统一执行以下流程：**
+**任何步骤中遇到 HTTP 401（Token 无效/过期）或 Token 缺失（code=-2）时，统一执行以下流程：**
 
-1. 删除已失效的 Token 文件：`rm -f ~/.muse/token`
-2. 获取设备 ID 并生成注册链接（两条命令顺序执行）：
+1. 获取注册链接：
 ```bash
-DEVICE_ID=$(python3 scripts/muse_api.py device-id)
-REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
+python3 scripts/muse_api.py register-url
 ```
-3. 读取 `assets/register-guide.md` 获取引导提示
-4. 向用户展示注册引导，使用上面生成的 `$REGISTER_URL`：
+返回 JSON 中的 `url` 字段即为 `$REGISTER_URL`。
+2. 读取 `assets/register-guide.md` 获取引导提示
+3. 向用户展示注册引导，使用上面获取的 `$REGISTER_URL`：
 ```
 你的登录已过期（或尚未登录），需要先完成验证。
 
@@ -51,35 +50,31 @@ REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
 
 整个过程只需 30 秒～
 ```
-5. **等待用户粘贴 Token**（见「粘贴 Token 识别」）
-6. Token 验证成功后，**回到触发本兜底的原始步骤继续执行**
+4. **等待用户粘贴 Token**（见「粘贴 Token 识别」）
+5. Token 验证成功后，**回到触发本兜底的原始步骤继续执行**
 
 **触发场景**：
 | 触发点 | 说明 |
 |--------|------|
-| Step 1 认证检查 | Token 文件不存在 / 环境变量未设置 / member-info 返回 HTTP 401 |
+| Step 1 认证检查 | member-info 返回 code=-2（未登录）或 HTTP 401 |
 | Step 3 提交生成 | generate 接口返回 HTTP 401 |
 | Step 4 同步轮询 | poll_song.py 输出 `{"event":"error","code":401}` |
 | 任意 API 调用 | 脚本 stderr 包含 `"code": 401` |
 
 ### Step 1: 认证检查
 
-按以下优先级获取 Token：
-1. 读取文件 `~/.muse/token` — 若文件存在且非空，使用其内容作为 Token
-2. 检查环境变量 `MUSE_TOKEN` — 若已设置，使用其值
-3. 以上均无 → 触发注册引导（读取 `assets/register-guide.md`）
+直接调用 `python3 scripts/muse_api.py member-info`（无需传 --token，脚本自动从 `~/.muse/token` 读取）。
 
-获取到 Token 后，调用 `scripts/muse_api.py member-info --token $TOKEN` 验证有效性并查询积分。
-
-**认证失败处理（HTTP 401）：** → 跳转 **Step 0: 认证兜底**
+- 成功 → 认证有效，展示积分信息
+- 返回 code=-2（未登录） → 跳转 **Step 0: 认证兜底**
+- 返回 HTTP 401 → 跳转 **Step 0: 认证兜底**
 
 ### 粘贴 Token 识别
 
 当用户发送的消息以 `eyJ` 开头（JWT 格式），按以下流程处理：
-1. 调用 `scripts/register.py verify --token {用户粘贴的内容}` 验证有效性
-2. 验证成功 → 创建目录 `mkdir -p ~/.muse` 并将 Token 写入 `~/.muse/token`
+1. 调用 `python3 scripts/register.py verify --token {用户粘贴的内容}` 验证有效性
+2. 验证成功 → Token 已由脚本自动保存到 `~/.muse/token`，直接进入创作流程
 3. 验证失败 → 提示用户 Token 无效，请重新注册获取
-4. 存储成功后立即进入创作流程，展示欢迎语
 
 **认证成功后展示欢迎语：**
 ```
@@ -137,7 +132,7 @@ A. 我来写 — 直接发送你的歌词
 B. AI 帮写 — 告诉我主题，AI 生成歌词供你修改
 ```
    - 用户选 A → 等待用户发送歌词（支持 [Verse] [Chorus] 等结构标签）
-   - 用户选 B → 请用户描述主题（至少 10 个字），运行 `scripts/muse_api.py generate-lyrics --token $TOKEN --mode master --title "{标题}" --prompt "{用户描述}"` 生成歌词。**必须使用 `--mode master`（同步返回），禁止使用 `--mode lite`（异步），因为 lite 模式会占用生成队列导致后续歌曲生成被阻塞。** 如果 master 模式返回 502/503 错误，不要重试 API，改由 AI 直接根据用户描述创作歌词（使用 [Verse] [Chorus] 等结构标签）
+   - 用户选 B → 请用户描述主题（至少 10 个字），运行 `python3 scripts/muse_api.py generate-lyrics --mode master --title "{标题}" --prompt "{用户描述}"` 生成歌词。**必须使用 `--mode master`（同步返回），禁止使用 `--mode lite`（异步），因为 lite 模式会占用生成队列导致后续歌曲生成被阻塞。** 如果 master 模式返回 502/503 错误，不要重试 API，改由 AI 直接根据用户描述创作歌词（使用 [Verse] [Chorus] 等结构标签）
 5. 展示歌词供用户确认/修改（用户回复"OK"确认，或发送修改后的版本）
 
 ---
@@ -197,8 +192,8 @@ B. AI 帮写 — 告诉我主题，AI 生成歌词供你修改
 ```
 
 确认后：
-1. 检查积分是否充足（运行 `scripts/muse_api.py member-info`，credits < 10 则拒绝并引导充值）
-2. 提交生成（运行 `scripts/muse_api.py generate`）
+1. 检查积分是否充足（运行 `python3 scripts/muse_api.py member-info`，credits < 10 则拒绝并引导充值）
+2. 提交生成（运行 `python3 scripts/muse_api.py generate --description "..." --mode ... --voice ... --title "..."`，无需传 --token）
 3. 同步轮询等待结果（见 Step 4）
 
 > ⚠️ 步骤 1-2 中任何接口返回 HTTP 401 → 跳转 **Step 0: 认证兜底**
@@ -228,7 +223,7 @@ B. AI 帮写 — 告诉我主题，AI 生成歌词供你修改
 从第 60 秒起，每 10 秒调用一次 `muse_api.py query` 查询实际状态，最多查询 **12 次**（再等 2 分钟）。
 
 每次查询流程：
-1. 运行 `scripts/muse_api.py query --token $TOKEN --task-id $TASK_ID`
+1. 运行 `python3 scripts/muse_api.py query`（无需传 --token 和 --task-id，脚本自动读取）
 2. 解析返回的 JSON（含 `songs` 数组，每首歌有 `status` 字段）
 3. 根据结果决定下一步：
 
@@ -263,7 +258,7 @@ for i in 0..5:
 
 # 阶段二：真实查询（60s+）
 for i in 1..12:
-    result = Bash("python3 scripts/muse_api.py query --token $TOKEN --task-id $TASK_ID")
+    result = Bash("python3 scripts/muse_api.py query")
     解析 JSON
     if 所有 status==2 或 所有 audioUrl 非空:
         输出 "✅ 创作完成 ▎███████████████ 100%"
@@ -492,20 +487,20 @@ B. AI 帮写 — 告诉我主题，AI 生成歌词供你修改
 > 禁止通过 `--help` 自行发现或使用未列出的命令。若命令报错，对照下方示例检查参数拼写（CLI 参数使用 kebab-case，如 `--song-model` 而非 `--songModel`）。
 
 ```bash
-# 查询会员信息和积分
-python3 scripts/muse_api.py member-info --token $MUSE_TOKEN
+# 查询会员信息和积分（token 自动从 ~/.muse/token 读取）
+python3 scripts/muse_api.py member-info
 
 # 获取风格列表
 python3 scripts/muse_api.py styles
 
 # 生成歌曲（灵感模式）
-python3 scripts/muse_api.py generate --token $MUSE_TOKEN \
+python3 scripts/muse_api.py generate \
   --description "一首关于夏天海边的甜蜜情歌" \
   --voice female \
   --title "海边的夏天"
 
 # 生成歌曲（定制模式，自定义歌词）
-python3 scripts/muse_api.py generate --token $MUSE_TOKEN \
+python3 scripts/muse_api.py generate \
   --description "[Verse]\n阳光洒在海面上...\n[Chorus]\n这个夏天..." \
   --style "流行" \
   --voice female \
@@ -513,20 +508,26 @@ python3 scripts/muse_api.py generate --token $MUSE_TOKEN \
   --title "海边的夏天"
 
 # 生成歌曲（纯音乐）
-python3 scripts/muse_api.py generate --token $MUSE_TOKEN \
+python3 scripts/muse_api.py generate \
   --description "轻快的钢琴曲" \
   --mode instrumental
 
-# 查询歌曲状态
-python3 scripts/muse_api.py query --token $MUSE_TOKEN --task-id TASK_ID
+# 查询歌曲状态（自动读取最近任务的 task-id）
+python3 scripts/muse_api.py query
+
+# 查询指定任务
+python3 scripts/muse_api.py query --task-id TASK_ID
 
 # AI 生成歌词（同步返回）
-python3 scripts/muse_api.py generate-lyrics --token $MUSE_TOKEN \
+python3 scripts/muse_api.py generate-lyrics \
   --mode master --title "歌曲标题" --prompt "歌曲主题描述"
 
 # AI 生成歌词（异步返回 taskId）
-python3 scripts/muse_api.py generate-lyrics --token $MUSE_TOKEN \
+python3 scripts/muse_api.py generate-lyrics \
   --mode lite --prompt "写一首关于夏天的歌"
+
+# 获取注册链接
+python3 scripts/muse_api.py register-url
 ```
 
 ### register.py — 注册流程
@@ -542,8 +543,8 @@ python3 scripts/register.py login --phone 13800138000 --code 1234
 ### poll_song.py — 异步轮询
 
 ```bash
-# 轮询歌曲生成状态（每5秒查一次，超时300秒）
-python3 scripts/poll_song.py --token $MUSE_TOKEN --task-id TASK_ID
+# 轮询歌曲生成状态（自动读取 token 和 task-id，每5秒查一次，超时300秒）
+python3 scripts/poll_song.py
 ```
 
 输出 JSON 格式进度事件（每行一个 JSON），便于解析：

@@ -5,15 +5,14 @@
 **使用本模板前，必须先执行以下命令获取注册链接：**
 
 ```bash
-DEVICE_ID=$(python scripts/muse_api.py device-id)
-REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
+python3 scripts/muse_api.py register-url
 ```
 
-后续提示中所有 `$REGISTER_URL` 均使用上面生成的实际 URL。
+返回 JSON 中的 `url` 字段即为 `$REGISTER_URL`。
 
-## 场景：用户未设置 Token
+## 场景：用户未登录
 
-当 `~/.muse/token` 文件不存在且环境变量 `MUSE_TOKEN` 未设置时，使用以下引导流程。
+当 `member-info` 返回 code=-2（未登录）时，使用以下引导流程。
 
 ### 引导提示
 
@@ -33,8 +32,8 @@ REGISTER_URL="https://skills.muse.top/?did=${DEVICE_ID}"
 
 用户粘贴的内容以 `eyJ` 开头时，自动识别为 Token：
 
-1. 运行 `scripts/register.py verify --token {Token}` 验证
-2. 验证成功 → `mkdir -p ~/.muse && echo "{Token}" > ~/.muse/token`
+1. 运行 `python3 scripts/register.py verify --token {Token}` 验证
+2. 验证成功 → Token 已由脚本自动保存到 `~/.muse/token`
 3. 回复：
 ```
 ✅ 认证成功！

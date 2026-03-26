@@ -13,8 +13,10 @@ import urllib.error
 
 BASE_URL = "https://skill-api.muse.top"
 
-# 设备 ID 持久化路径
+# 持久化路径（~/.muse/ 为统一数据目录）
 _DEVICE_ID_PATH = os.path.expanduser("~/.muse/device_id")
+_TOKEN_PATH = os.path.expanduser("~/.muse/token")
+_TASK_ID_PATH = os.path.expanduser("~/.muse/task_id")
 
 
 def _get_machine_id():
@@ -47,6 +49,46 @@ def _get_machine_id():
     with open(_DEVICE_ID_PATH, "w") as f:
         f.write(machine_id)
     return machine_id
+
+
+def _save_token(token):
+    """将 token 持久化到 ~/.muse/token"""
+    os.makedirs(os.path.dirname(_TOKEN_PATH), exist_ok=True)
+    with open(_TOKEN_PATH, "w") as f:
+        f.write(token)
+
+
+def _load_token():
+    """从 ~/.muse/token 读取 token，不存在则抛出错误"""
+    if not os.path.isfile(_TOKEN_PATH):
+        raise MuseAPIError(-2, "未登录：~/.muse/token 不存在，请先完成注册")
+    token = open(_TOKEN_PATH).read().strip()
+    if not token:
+        raise MuseAPIError(-2, "Token 文件为空，请重新注册")
+    return token
+
+
+def _clear_token():
+    """删除 token 文件"""
+    if os.path.isfile(_TOKEN_PATH):
+        os.remove(_TOKEN_PATH)
+
+
+def _save_task_id(task_id):
+    """将 task_id 持久化到 ~/.muse/task_id"""
+    os.makedirs(os.path.dirname(_TASK_ID_PATH), exist_ok=True)
+    with open(_TASK_ID_PATH, "w") as f:
+        f.write(task_id)
+
+
+def _load_task_id():
+    """从 ~/.muse/task_id 读取"""
+    if not os.path.isfile(_TASK_ID_PATH):
+        raise MuseAPIError(-2, "没有进行中的任务：~/.muse/task_id 不存在")
+    task_id = open(_TASK_ID_PATH).read().strip()
+    if not task_id:
+        raise MuseAPIError(-2, "task_id 文件为空")
+    return task_id
 
 
 def _auth_headers(token):
@@ -226,14 +268,14 @@ def main():
 
     # member-info
     p = sub.add_parser("member-info", help="查询会员信息和积分")
-    p.add_argument("--token", required=True, help="authToken")
+    p.add_argument("--token", default=None, help="已废弃，token 自动从 ~/.muse/token 读取")
 
     # styles
     sub.add_parser("styles", help="获取音乐风格列表")
 
     # generate
     p = sub.add_parser("generate", help="生成歌曲")
-    p.add_argument("--token", required=True, help="authToken")
+    p.add_argument("--token", default=None, help="已废弃，token 自动从 ~/.muse/token 读取")
     p.add_argument("--description", required=True, help="歌曲描述或歌词")
     p.add_argument("--mode", default="lite", choices=["lite", "custom", "instrumental"], help="模式")
     p.add_argument("--title", default="", help="歌曲标题")
@@ -243,8 +285,8 @@ def main():
 
     # query
     p = sub.add_parser("query", help="查询歌曲生成状态")
-    p.add_argument("--token", required=True, help="authToken")
-    p.add_argument("--task-id", required=True, help="任务ID")
+    p.add_argument("--token", default=None, help="已废弃，token 自动从 ~/.muse/token 读取")
+    p.add_argument("--task-id", default=None, help="任务ID（可选，默认读取最近任务）")
 
     # song-info
     p = sub.add_parser("song-info", help="获取歌曲详情")
@@ -252,10 +294,13 @@ def main():
 
     # generate-lyrics
     p = sub.add_parser("generate-lyrics", help="生成歌词")
-    p.add_argument("--token", required=True, help="authToken")
+    p.add_argument("--token", default=None, help="已废弃，token 自动从 ~/.muse/token 读取")
     p.add_argument("--mode", default="lite", choices=["lite", "master"], help="lite=异步, master=同步")
     p.add_argument("--prompt", default="", help="歌词描述或提示词")
     p.add_argument("--title", default="", help="歌曲标题")
+
+    # register-url
+    sub.add_parser("register-url", help="输出注册链接（含设备ID）")
 
     args = parser.parse_args()
 
@@ -265,14 +310,14 @@ def main():
             return
 
         elif args.command == "member-info":
-            _print_json(member_info(args.token))
+            _print_json(member_info(_load_token()))
 
         elif args.command == "styles":
             _print_json(get_styles())
 
         elif args.command == "generate":
             task_id = generate_song(
-                token=args.token,
+                token=_load_token(),
                 description=args.description,
                 mode=args.mode,
                 title=args.title,
@@ -280,17 +325,23 @@ def main():
                 voice=args.voice,
                 song_model=args.song_model,
             )
+            _save_task_id(task_id)
             _print_json({"taskId": task_id})
 
         elif args.command == "query":
-            _print_json(query_song(args.token, args.task_id))
+            task_id = args.task_id if args.task_id else _load_task_id()
+            _print_json(query_song(_load_token(), task_id))
 
         elif args.command == "song-info":
             _print_json(get_song_info(args.work_id))
 
+        elif args.command == "register-url":
+            device_id = _get_machine_id()
+            _print_json({"url": f"https://skills.muse.top/?did={device_id}", "deviceId": device_id})
+
         elif args.command == "generate-lyrics":
             result = generate_lyrics(
-                token=args.token,
+                token=_load_token(),
                 mode=args.mode,
                 prompt=args.prompt,
                 title=args.title,

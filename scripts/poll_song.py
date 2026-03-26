@@ -8,7 +8,7 @@ import os
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from muse_api import query_song, MuseAPIError
+from muse_api import query_song, MuseAPIError, _load_token, _load_task_id
 
 
 def _emit(event, **kwargs):
@@ -133,13 +133,19 @@ def poll(token, task_id, interval=5, timeout=300):
 
 def main():
     parser = argparse.ArgumentParser(description="Muse 歌曲生成异步轮询")
-    parser.add_argument("--token", required=True, help="MUSE_TOKEN")
-    parser.add_argument("--task-id", required=True, help="歌曲生成任务ID")
+    parser.add_argument("--token", default=None, help="已废弃，token 自动从 ~/.muse/token 读取")
+    parser.add_argument("--task-id", default=None, help="任务ID（可选，默认读取最近任务）")
     parser.add_argument("--interval", type=int, default=5, help="轮询间隔秒数（默认5）")
     parser.add_argument("--timeout", type=int, default=300, help="超时秒数（默认300）")
     args = parser.parse_args()
 
-    result = poll(args.token, args.task_id, args.interval, args.timeout)
+    try:
+        token = _load_token()
+        task_id = args.task_id if args.task_id else _load_task_id()
+    except MuseAPIError as e:
+        _emit("error", code=e.code, message=e.msg)
+        sys.exit(1)
+    result = poll(token, task_id, args.interval, args.timeout)
     sys.exit(0 if result else 1)
 
 
